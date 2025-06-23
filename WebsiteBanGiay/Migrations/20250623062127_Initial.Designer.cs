@@ -12,7 +12,7 @@ using WebsiteBanGiay.Models;
 namespace WebsiteBanGiay.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250622173020_Initial")]
+    [Migration("20250623062127_Initial")]
     partial class Initial
     {
         /// <inheritdoc />

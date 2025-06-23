@@ -1,8 +1,7 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebsiteBanGiay.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -10,7 +9,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Text.Json;
 
 namespace WebsiteBanGiay.Areas.Admin.Controllers
 {
@@ -18,9 +16,6 @@ namespace WebsiteBanGiay.Areas.Admin.Controllers
     [Authorize(Roles = "Admin")]
     public class ProductController : AdminBaseController
     {
-        private const int MaxFileSize = 5 * 1024 * 1024; // 5MB
-        private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".gif" };
-        private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _env;
         private readonly ILogger<ProductController> _logger;
 
@@ -29,87 +24,79 @@ namespace WebsiteBanGiay.Areas.Admin.Controllers
             IWebHostEnvironment env,
             ILogger<ProductController> logger) : base(logger, context)
         {
-            _context = context;
             _env = env;
             _logger = logger;
         }
 
-        // GET: Admin/Product
-        public async Task<IActionResult> Index()
+        // GET: Admin/Products
+        public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
         {
             try
             {
-                var products = await _context.Products
-                    .Include(p => p.Brand)
+                var query = _context.Products
                     .Include(p => p.Category)
+                    .Include(p => p.Brand)
                     .Include(p => p.Images)
                     .AsNoTracking()
-                    .OrderBy(p => p.ProductName)
-                    .ToListAsync();
+                    .OrderBy(p => p.ProductName);
+
+                var (products, totalItems) = ApplyPagination(query, page, pageSize);
+
+                ViewBag.CurrentPage = page;
+                ViewBag.TotalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
 
                 return View(products);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error loading product list");
-                TempData["Error"] = "An error occurred while loading the product list";
-                return RedirectToAction("Index", "Home");
+                _logger.LogError(ex, "Lỗi khi tải danh sách sản phẩm");
+                return AdminErrorView("Đã xảy ra lỗi khi tải danh sách sản phẩm", ex);
             }
         }
 
-        // GET: Admin/Product/Details/5
+        // GET: Admin/Products/Details/5
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
             {
-                return NotFound();
+                return HandleNotFound("Không tìm thấy ID sản phẩm");
             }
 
             try
             {
                 var product = await _context.Products
-                    .Include(p => p.Brand)
                     .Include(p => p.Category)
+                    .Include(p => p.Brand)
                     .Include(p => p.Images)
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(p => p.ProductId == id);
+                    .FirstOrDefaultAsync(m => m.ProductId == id);
 
                 if (product == null)
                 {
-                    return NotFound();
+                    return HandleNotFound($"Không tìm thấy sản phẩm với ID: {id}");
                 }
 
                 return View(product);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error viewing product details ID: {id}");
-                TempData["Error"] = "An error occurred while viewing product details";
-                return RedirectToAction(nameof(Index));
+                _logger.LogError(ex, $"Lỗi khi xem chi tiết sản phẩm ID: {id}");
+                return AdminErrorView($"Đã xảy ra lỗi khi xem chi tiết sản phẩm ID: {id}", ex);
             }
         }
 
-        // GET: Admin/Product/Create
+        // GET: Admin/Products/Create
         public async Task<IActionResult> Create()
         {
-            try
-            {
-                await PrepareSelectLists();
-                return View(new Product());
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error loading product creation form");
-                TempData["Error"] = "An error occurred while loading the product creation form";
-                return RedirectToAction(nameof(Index));
-            }
+            await LoadDropdownData();
+            return View(new Product());
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Product product, IFormFile mainImage, List<IFormFile> additionalImages)
+        public async Task<IActionResult> Create(Product product)
         {
-            // Ignore navigation property validation
+            // Bỏ qua validate các navigation properties
             ModelState.Remove("Category");
             ModelState.Remove("Brand");
             ModelState.Remove("Images");
@@ -117,123 +104,91 @@ namespace WebsiteBanGiay.Areas.Admin.Controllers
             ModelState.Remove("CartItems");
             ModelState.Remove("Reviews");
 
-            if (ModelState.IsValid && mainImage != null && mainImage.Length > 0)
+            // Tự động tạo slug nếu để trống
+            if (string.IsNullOrEmpty(product.Slug))
             {
-                using var transaction = await _context.Database.BeginTransactionAsync();
+                product.Slug = GenerateSlug(product.ProductName);
+                ModelState.Remove("Slug"); // Xóa validation error nếu có
+            }
+            if (ModelState.IsValid)
+            {
                 try
                 {
-                    // Validate main image
-                    var fileExtension = Path.GetExtension(mainImage.FileName).ToLower();
-                    if (!AllowedExtensions.Contains(fileExtension))
+                    if (product.ImageFile != null && product.ImageFile.Length > 0)
                     {
-                        ModelState.AddModelError("mainImage", "Chỉ cho phép file jpg, jpeg, png, gif");
-                        await PrepareSelectLists();
+                        product.ImageUrl = await SaveFile(product.ImageFile, "products");
+                        ModelState.Remove("ImageUrl"); // Xóa validation error
+                    }
+                    else if (string.IsNullOrEmpty(product.ImageUrl))
+                    {
+                        ModelState.AddModelError("ImageFile", "Vui lòng chọn ảnh đại diện");
+                        await LoadDropdownData();
                         return View(product);
                     }
 
-                    if (mainImage.Length > MaxFileSize)
+                    // Xử lý nhiều ảnh sản phẩm
+                    if (product.ProductImages != null && product.ProductImages.Count > 0)
                     {
-                        ModelState.AddModelError("mainImage", "Kích thước file không vượt quá 5MB");
-                        await PrepareSelectLists();
-                        return View(product);
-                    }
-
-                    // Process main image
-                    string uploadsFolder = Path.Combine(_env.WebRootPath, "uploads", "products");
-                    Directory.CreateDirectory(uploadsFolder);
-                    string fileName = Guid.NewGuid().ToString() + fileExtension;
-                    string filePath = Path.Combine(uploadsFolder, fileName);
-
-                    using (var stream = new FileStream(filePath, FileMode.Create))
-                    {
-                        await mainImage.CopyToAsync(stream);
-                    }
-
-                    product.ImageUrl = "/uploads/products/" + fileName;
-                    product.CreatedAt = DateTime.UtcNow;
-
-                    _context.Products.Add(product);
-                    int result = await _context.SaveChangesAsync();
-
-                    if (result == 0)
-                    {
-                        ModelState.AddModelError("", "Không thể thêm sản phẩm vào cơ sở dữ liệu");
-                        await PrepareSelectLists();
-                        return View(product);
-                    }
-
-                    // Process additional images
-                    if (additionalImages != null && additionalImages.Any())
-                    {
-                        string galleryFolder = Path.Combine(_env.WebRootPath, "uploads", "products", "gallery");
-                        Directory.CreateDirectory(galleryFolder);
-
-                        foreach (var img in additionalImages)
+                        product.Images = new List<ProductImage>();
+                        foreach (var imageFile in product.ProductImages)
                         {
-                            fileExtension = Path.GetExtension(img.FileName).ToLower();
-                            if (!AllowedExtensions.Contains(fileExtension) || img.Length > MaxFileSize)
+                            if (imageFile.Length > 0)
                             {
-                                _logger.LogWarning($"Bỏ qua ảnh bổ sung không hợp lệ: {img.FileName}");
-                                continue;
+                                var imageUrl = await SaveFile(imageFile, "products/images");
+                                product.Images.Add(new ProductImage
+                                {
+                                    Url = imageUrl,
+                                    IsMain = false,
+                                    SortOrder = 0
+                                });
                             }
-
-                            fileName = Guid.NewGuid().ToString() + fileExtension;
-                            filePath = Path.Combine(galleryFolder, fileName);
-
-                            using (var stream = new FileStream(filePath, FileMode.Create))
-                            {
-                                await img.CopyToAsync(stream);
-                            }
-
-                            _context.ProductImages.Add(new ProductImage
-                            {
-                                ProductId = product.ProductId,
-                                Url = "/uploads/products/gallery/" + fileName
-                            });
                         }
-
-                        await _context.SaveChangesAsync();
                     }
 
-                    await transaction.CommitAsync();
-                    TempData["Success"] = $"Sản phẩm {product.ProductName} được tạo thành công!";
+                    // Tạo slug nếu chưa có
+                    if (string.IsNullOrEmpty(product.Slug))
+                    {
+                        product.Slug = GenerateSlug(product.ProductName);
+                    }
+
+                    product.CreatedAt = DateTime.UtcNow;
+                    product.UpdatedAt = DateTime.UtcNow;
+
+                    _context.Add(product);
+                    await _context.SaveChangesAsync();
+
+                    TempData["Success"] = $"Đã thêm sản phẩm {product.ProductName} thành công!";
                     return RedirectToAction(nameof(Index));
+                }
+
+                catch (DbUpdateException ex)
+                {
+                    _logger.LogError(ex, "Lỗi database khi thêm sản phẩm");
+                    ModelState.AddModelError("", "Lỗi khi lưu sản phẩm. Có thể tên sản phẩm đã tồn tại.");
+                }
+                catch (IOException ex)
+                {
+                    _logger.LogError(ex, "Lỗi khi xử lý ảnh sản phẩm");
+                    ModelState.AddModelError("", "Lỗi khi lưu ảnh sản phẩm. Vui lòng thử lại.");
                 }
                 catch (Exception ex)
                 {
-                    await transaction.RollbackAsync();
-                    _logger.LogError(ex, "Lỗi khi tạo sản phẩm");
-                    ModelState.AddModelError("", "Có lỗi xảy ra khi tạo PLEASE ASSISTANCE FROM MY AI tạo sản phẩm");
-                }
-            }
-            else
-            {
-                if (mainImage == null || mainImage.Length == 0)
-                {
-                    ModelState.AddModelError("mainImage", "Ảnh đại diện là bắt buộc");
+                    _logger.LogError(ex, "Lỗi không xác định khi thêm sản phẩm");
+                    ModelState.AddModelError("", "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.");
                 }
 
-                var validationErrors = ModelState
-                    .Where(x => x.Value.Errors.Count > 0)
-                    .Select(x => new
-                    {
-                        Field = x.Key,
-                        Errors = string.Join(", ", x.Value.Errors.Select(e => e.ErrorMessage))
-                    });
-
-                _logger.LogWarning($"Validation errors: {JsonSerializer.Serialize(validationErrors)}");
             }
 
-            await PrepareSelectLists();
+            await LoadDropdownData();
             return View(product);
         }
 
-        // GET: Admin/Product/Edit/5
+        // GET: Admin/Products/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
             {
-                return NotFound();
+                return HandleNotFound("Không tìm thấy ID sản phẩm");
             }
 
             try
@@ -244,31 +199,28 @@ namespace WebsiteBanGiay.Areas.Admin.Controllers
 
                 if (product == null)
                 {
-                    return NotFound();
+                    return HandleNotFound($"Không tìm thấy sản phẩm với ID: {id}");
                 }
 
-                await PrepareSelectLists(product.CategoryId, product.BrandId);
+                await LoadDropdownData();
                 return View(product);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error loading edit form for product ID: {id}");
-                TempData["Error"] = "An error occurred while loading the edit form";
-                return RedirectToAction(nameof(Index));
+                _logger.LogError(ex, $"Lỗi khi tải form chỉnh sửa sản phẩm ID: {id}");
+                return AdminErrorView($"Đã xảy ra lỗi khi tải form chỉnh sửa sản phẩm ID: {id}", ex);
             }
         }
 
-        // POST: Admin/Product/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, Product product, IFormFile newMainImage, List<IFormFile> newAdditionalImages, List<int> deleteImages)
+        public async Task<IActionResult> Edit(int id, Product product)
         {
             if (id != product.ProductId)
             {
-                return NotFound();
+                return HandleNotFound("ID sản phẩm không khớp");
             }
 
-            // Ignore navigation property validation
             ModelState.Remove("Category");
             ModelState.Remove("Brand");
             ModelState.Remove("Images");
@@ -278,7 +230,6 @@ namespace WebsiteBanGiay.Areas.Admin.Controllers
 
             if (ModelState.IsValid)
             {
-                using var transaction = await _context.Database.BeginTransactionAsync();
                 try
                 {
                     var existingProduct = await _context.Products
@@ -287,178 +238,120 @@ namespace WebsiteBanGiay.Areas.Admin.Controllers
 
                     if (existingProduct == null)
                     {
-                        return NotFound();
+                        return HandleNotFound($"Không tìm thấy sản phẩm với ID: {id}");
                     }
 
-                    // Process new main image
-                    if (newMainImage != null && newMainImage.Length > 0)
-                    {
-                        var fileExtension = Path.GetExtension(newMainImage.FileName).ToLower();
-                        if (!AllowedExtensions.Contains(fileExtension))
-                        {
-                            ModelState.AddModelError("newMainImage", "Only image files (jpg, jpeg, png, gif) are allowed");
-                            await PrepareSelectLists(product.CategoryId, product.BrandId);
-                            return View(product);
-                        }
-
-                        if (newMainImage.Length > MaxFileSize)
-                        {
-                            ModelState.AddModelError("newMainImage", "File size cannot exceed 5MB");
-                            await PrepareSelectLists(product.CategoryId, product.BrandId);
-                            return View(product);
-                        }
-
-                        // Delete old main image
-                        if (!string.IsNullOrEmpty(existingProduct.ImageUrl))
-                        {
-                            var oldFilePath = Path.Combine(_env.WebRootPath, existingProduct.ImageUrl.TrimStart('/'));
-                            if (System.IO.File.Exists(oldFilePath))
-                            {
-                                System.IO.File.Delete(oldFilePath);
-                            }
-                        }
-
-                        string uploadsFolder = Path.Combine(_env.WebRootPath, "uploads", "products");
-                        string fileName = Guid.NewGuid().ToString() + fileExtension;
-                        string filePath = Path.Combine(uploadsFolder, fileName);
-
-                        using (var stream = new FileStream(filePath, FileMode.Create))
-                        {
-                            await newMainImage.CopyToAsync(stream);
-                        }
-
-                        existingProduct.ImageUrl = "/uploads/products/" + fileName;
-                    }
-
-                    // Update product properties
+                    // Cập nhật thông tin cơ bản
                     existingProduct.ProductName = product.ProductName;
+                    existingProduct.Slug = string.IsNullOrEmpty(product.Slug) ? GenerateSlug(product.ProductName) : product.Slug;
                     existingProduct.Description = product.Description;
                     existingProduct.Price = product.Price;
+                    existingProduct.DiscountPrice = product.DiscountPrice;
                     existingProduct.StockQuantity = product.StockQuantity;
                     existingProduct.CategoryId = product.CategoryId;
                     existingProduct.BrandId = product.BrandId;
                     existingProduct.IsActive = product.IsActive;
+                    existingProduct.UpdatedAt = DateTime.UtcNow;
 
-                    // Process images to delete
-                    if (deleteImages != null && deleteImages.Any())
+                    // Xử lý ảnh đại diện nếu có thay đổi
+                    if (product.ImageFile != null && product.ImageFile.Length > 0)
                     {
-                        var imagesToDelete = existingProduct.Images
-                            .Where(img => deleteImages.Contains(img.ImageId))
-                            .ToList();
-
-                        foreach (var img in imagesToDelete)
+                        // Xóa ảnh cũ nếu tồn tại
+                        if (!string.IsNullOrEmpty(existingProduct.ImageUrl))
                         {
-                            var filePath = Path.Combine(_env.WebRootPath, img.Url.TrimStart('/'));
-                            if (System.IO.File.Exists(filePath))
-                            {
-                                System.IO.File.Delete(filePath);
-                            }
-                            _context.ProductImages.Remove(img);
+                            DeleteFile(existingProduct.ImageUrl);
                         }
+                        existingProduct.ImageUrl = await SaveFile(product.ImageFile, "products");
                     }
 
-                    // Process new additional images
-                    if (newAdditionalImages != null && newAdditionalImages.Any())
+                    // Xử lý thêm ảnh sản phẩm nếu có
+                    if (product.ProductImages != null && product.ProductImages.Count > 0)
                     {
-                        string galleryFolder = Path.Combine(_env.WebRootPath, "uploads", "products", "gallery");
-                        if (!Directory.Exists(galleryFolder))
+                        foreach (var imageFile in product.ProductImages)
                         {
-                            Directory.CreateDirectory(galleryFolder);
-                        }
-
-                        foreach (var img in newAdditionalImages)
-                        {
-                            var fileExtension = Path.GetExtension(img.FileName).ToLower();
-                            if (!AllowedExtensions.Contains(fileExtension) || img.Length > MaxFileSize)
+                            if (imageFile.Length > 0)
                             {
-                                _logger.LogWarning($"Skipping invalid additional image: {img.FileName}");
-                                continue;
+                                var imageUrl = await SaveFile(imageFile, "products/images");
+                                existingProduct.Images.Add(new ProductImage
+                                {
+                                    Url = imageUrl,
+                                    IsMain = false,
+                                    SortOrder = 0
+                                });
                             }
-
-                            string fileName = Guid.NewGuid().ToString() + fileExtension;
-                            string filePath = Path.Combine(galleryFolder, fileName);
-
-                            using (var stream = new FileStream(filePath, FileMode.Create))
-                            {
-                                await img.CopyToAsync(stream);
-                            }
-
-                            _context.ProductImages.Add(new ProductImage
-                            {
-                                ProductId = product.ProductId,
-                                Url = "/uploads/products/gallery/" + fileName
-                            });
                         }
                     }
 
                     _context.Update(existingProduct);
                     await _context.SaveChangesAsync();
-                    await transaction.CommitAsync();
 
-                    TempData["Success"] = $"Product {product.ProductName} updated successfully!";
+                    TempData["Success"] = $"Đã cập nhật sản phẩm {product.ProductName} thành công!";
                     return RedirectToAction(nameof(Index));
+                }
+                catch (DbUpdateConcurrencyException ex)
+                {
+                    if (!ProductExists(product.ProductId))
+                    {
+                        return HandleNotFound($"Không tìm thấy sản phẩm với ID: {id}");
+                    }
+                    _logger.LogError(ex, $"Lỗi đồng thời khi cập nhật sản phẩm ID: {id}");
+                    ModelState.AddModelError("", "Lỗi đồng thời khi lưu thay đổi. Vui lòng thử lại.");
+                }
+                catch (DbUpdateException ex)
+                {
+                    _logger.LogError(ex, $"Lỗi database khi cập nhật sản phẩm ID: {id}");
+                    ModelState.AddModelError("", "Không thể cập nhật sản phẩm. Có thể tên sản phẩm đã tồn tại.");
+                }
+                catch (IOException ex)
+                {
+                    _logger.LogError(ex, $"Lỗi khi xử lý ảnh sản phẩm ID: {id}");
+                    ModelState.AddModelError("", "Đã xảy ra lỗi khi xử lý ảnh. Vui lòng thử lại.");
                 }
                 catch (Exception ex)
                 {
-                    await transaction.RollbackAsync();
-                    _logger.LogError(ex, $"Error updating product ID: {id}");
-                    ModelState.AddModelError("", "An error occurred while updating the product");
+                    _logger.LogError(ex, $"Lỗi không xác định khi cập nhật sản phẩm ID: {id}");
+                    ModelState.AddModelError("", "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.");
                 }
             }
-            else
-            {
-                var validationErrors = ModelState
-                    .Where(x => x.Value.Errors.Count > 0)
-                    .Select(x => new
-                    {
-                        Field = x.Key,
-                        Errors = string.Join(", ", x.Value.Errors.Select(e => e.ErrorMessage))
-                    });
 
-                _logger.LogWarning($"Validation errors: {JsonSerializer.Serialize(validationErrors)}");
-            }
-
-            await PrepareSelectLists(product.CategoryId, product.BrandId);
+            await LoadDropdownData();
             return View(product);
         }
 
-        // GET: Admin/Product/Delete/5
+        // GET: Admin/Products/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
             {
-                return NotFound();
+                return HandleNotFound("Không tìm thấy ID sản phẩm");
             }
 
             try
             {
                 var product = await _context.Products
-                    .Include(p => p.Brand)
                     .Include(p => p.Category)
+                    .Include(p => p.Brand)
                     .Include(p => p.Images)
-                    .FirstOrDefaultAsync(p => p.ProductId == id);
+                    .FirstOrDefaultAsync(m => m.ProductId == id);
 
                 if (product == null)
                 {
-                    return NotFound();
+                    return HandleNotFound($"Không tìm thấy sản phẩm với ID: {id}");
                 }
 
                 return View(product);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error loading delete form for product ID: {id}");
-                TempData["Error"] = "An error occurred while loading the delete form";
-                return RedirectToAction(nameof(Index));
+                _logger.LogError(ex, $"Lỗi khi tải form xóa sản phẩm ID: {id}");
+                return AdminErrorView($"Đã xảy ra lỗi khi tải form xóa sản phẩm ID: {id}", ex);
             }
         }
 
-        // POST: Admin/Product/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
                 var product = await _context.Products
@@ -467,71 +360,127 @@ namespace WebsiteBanGiay.Areas.Admin.Controllers
 
                 if (product == null)
                 {
-                    return NotFound();
+                    return HandleNotFound($"Không tìm thấy sản phẩm với ID: {id}");
                 }
 
-                // Delete main image
+                // Xóa ảnh đại diện
                 if (!string.IsNullOrEmpty(product.ImageUrl))
                 {
-                    var filePath = Path.Combine(_env.WebRootPath, product.ImageUrl.TrimStart('/'));
-                    if (System.IO.File.Exists(filePath))
-                    {
-                        System.IO.File.Delete(filePath);
-                    }
+                    DeleteFile(product.ImageUrl);
                 }
 
-                // Delete additional images
-                foreach (var img in product.Images)
+                // Xóa các ảnh sản phẩm
+                foreach (var image in product.Images)
                 {
-                    var filePath = Path.Combine(_env.WebRootPath, img.Url.TrimStart('/'));
-                    if (System.IO.File.Exists(filePath))
-                    {
-                        System.IO.File.Delete(filePath);
-                    }
+                    DeleteFile(image.Url);
                 }
 
                 _context.Products.Remove(product);
                 await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
 
-                TempData["Success"] = $"Product {product.ProductName} deleted successfully!";
+                TempData["Success"] = $"Đã xóa sản phẩm {product.ProductName} thành công!";
                 return RedirectToAction(nameof(Index));
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex, $"Lỗi database khi xóa sản phẩm ID: {id}");
+                TempData["Error"] = "Không thể xóa sản phẩm do có đơn hàng liên quan";
+            }
+            catch (IOException ex)
+            {
+                _logger.LogError(ex, $"Lỗi khi xóa ảnh sản phẩm ID: {id}");
+                TempData["Error"] = "Đã xóa sản phẩm nhưng có lỗi khi xóa ảnh";
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
-                _logger.LogError(ex, $"Error deleting product ID: {id}");
-                TempData["Error"] = "An error occurred while deleting the product";
-                return RedirectToAction(nameof(Index));
+                _logger.LogError(ex, $"Lỗi không xác định khi xóa sản phẩm ID: {id}");
+                TempData["Error"] = "Đã xảy ra lỗi hệ thống khi xóa sản phẩm";
             }
+
+            return RedirectToAction(nameof(Index));
         }
 
-        #region Helper Methods
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteImage(int imageId)
+        {
+            try
+            {
+                var image = await _context.ProductImages.FindAsync(imageId);
+                if (image == null)
+                {
+                    return Json(new { success = false, message = "Không tìm thấy ảnh" });
+                }
+
+                DeleteFile(image.Url);
+                _context.ProductImages.Remove(image);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Đã xóa ảnh thành công" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Lỗi khi xóa ảnh ID: {imageId}");
+                return Json(new { success = false, message = "Đã xảy ra lỗi khi xóa ảnh" });
+            }
+        }
 
         private bool ProductExists(int id)
         {
             return _context.Products.Any(e => e.ProductId == id);
         }
 
-        private async Task PrepareSelectLists(int? selectedCategoryId = null, int? selectedBrandId = null)
+        #region Helper Methods
+        private async Task LoadDropdownData()
         {
-            try
-            {
-                ViewBag.Categories = new SelectList(
-                    await _context.Categories.AsNoTracking().OrderBy(c => c.CategoryName).ToListAsync(),
-                    "CategoryId", "CategoryName", selectedCategoryId);
+            ViewBag.Categories = await _context.Categories
+                .OrderBy(c => c.CategoryName)
+                .ToListAsync();
 
-                ViewBag.Brands = new SelectList(
-                    await _context.Brands.AsNoTracking().OrderBy(b => b.BrandName).ToListAsync(),
-                    "BrandId", "BrandName", selectedBrandId);
-            }
-            catch (Exception ex)
+            ViewBag.Brands = await _context.Brands
+                .OrderBy(b => b.BrandName)
+                .ToListAsync();
+        }
+
+        private async Task<string> SaveFile(IFormFile file, string subFolder)
+        {
+            var uploadsFolder = Path.Combine(_env.WebRootPath, "uploads", subFolder);
+            if (!Directory.Exists(uploadsFolder))
             {
-                _logger.LogError(ex, "Error loading categories and brands");
-                TempData["Error"] = "Error loading categories and brands";
+                Directory.CreateDirectory(uploadsFolder);
+            }
+
+            var uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+            using (var fileStream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(fileStream);
+            }
+
+            return $"/uploads/{subFolder}/{uniqueFileName}";
+        }
+
+        private void DeleteFile(string filePath)
+        {
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                var fullPath = Path.Combine(_env.WebRootPath, filePath.TrimStart('/'));
+                if (System.IO.File.Exists(fullPath))
+                {
+                    System.IO.File.Delete(fullPath);
+                }
             }
         }
 
+        private string GenerateSlug(string name)
+        {
+            return name.ToLower()
+                .Replace(" ", "-")
+                .Replace(".", "")
+                .Replace(",", "")
+                .Replace("!", "");
+        }
         #endregion
     }
 }

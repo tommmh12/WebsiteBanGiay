@@ -7,13 +7,14 @@ using WebsiteBanGiay.Models;
 // Thêm các using mới
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using WebsiteBanGiay.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Đăng ký DbContext (giữ nguyên)
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
+builder.Services.AddTransient<IFileService, FileService>();
 // 2. Đăng ký Identity (đã đơn giản hóa)
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
