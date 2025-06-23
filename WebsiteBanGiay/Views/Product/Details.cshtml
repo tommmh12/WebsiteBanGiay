@@ -1,0 +1,36 @@
+﻿@model WebsiteBanGiay.Models.Product
+
+@{
+    ViewData["Title"] = "Chi tiết sản phẩm";
+}
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="@Model.ImageUrl" class="img-fluid rounded mb-3 border" alt="@Model.ProductName" />
+        <div class="d-flex flex-wrap gap-2">
+            @if (Model.Images != null)
+            {
+                foreach (var img in Model.Images)
+                {
+                            <img src="@img.Url" class="img-thumbnail" style="width: 80px; height: 80px; object-fit: cover;" alt="Ảnh phụ" />
+                }
+            }
+        </div>
+    </div>
+    <div class="col-md-6">
+        <h3>@Model.ProductName</h3>
+        <p class="text-muted">Thương hiệu: <strong>@Model.Brand?.BrandName</strong></p>
+        <p class="text-muted">Danh mục: <strong>@Model.Category?.CategoryName</strong></p>
+        <h4 class="text-danger fw-bold">@Model.Price.ToString("N0") ₫</h4>
+        <p class="mt-3">@Model.Description</p>
+        <form>
+            <div class="mb-3">
+                <label>Số lượng:</label>
+                <input type="number" class="form-control w-25" value="1" min="1" />
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-cart-plus"></i> Thêm vào giỏ hàng
+            </button>
+        </form>
+    </div>
+</div>

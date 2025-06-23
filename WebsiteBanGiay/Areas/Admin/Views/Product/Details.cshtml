@@ -1,0 +1,89 @@
+﻿@model WebsiteBanGiay.Models.Product
+
+@{
+    ViewData["Title"] = "Chi tiết sản phẩm";
+    ViewData["ActivePage"] = "Product";
+    Layout = "~/Areas/Admin/Views/Shared/_AdminLayout.cshtml";
+}
+
+<div class="product-management-container">
+    <!-- Header Card -->
+    <div class="management-header card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+            <h2 class="mb-1"><i class="fas fa-box me-2"></i>@ViewData["Title"]</h2>
+            <p class="text-muted mb-0">Thông tin chi tiết của sản phẩm</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <dl class="row">
+                <dt class="col-sm-3">Tên sản phẩm</dt>
+                <dd class="col-sm-9">@Model.ProductName</dd>
+                <dt class="col-sm-3">Mô tả</dt>
+                <dd class="col-sm-9">@Model.Description</dd>
+                <dt class="col-sm-3">Giá</dt>
+                <dd class="col-sm-9">@Model.Price.ToString("N0") đ</dd>
+                <dt class="col-sm-3">Tồn kho</dt>
+                <dd class="col-sm-9">@Model.StockQuantity</dd>
+                <dt class="col-sm-3">Danh mục</dt>
+                <dd class="col-sm-9">@(Model.Category != null ? Model.Category.CategoryName : "N/A")</dd>
+                <dt class="col-sm-3">Thương hiệu</dt>
+                <dd class="col-sm-9">@(Model.Brand != null ? Model.Brand.BrandName : "N/A")</dd>
+                <dt class="col-sm-3">Trạng thái</dt>
+                <dd class="col-sm-9">
+                    @if (Model.IsActive)
+                    {
+                        <span class="badge bg-success">Hiển thị</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">Ẩn</span>
+                    }
+                </dd>
+                <dt class="col-sm-3">Ngày tạo</dt>
+                <dd class="col-sm-9">@Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")</dd>
+                <dt class="col-sm-3">Ảnh chính</dt>
+                <dd class="col-sm-9">
+                    @if (!string.IsNullOrEmpty(Model.ImageUrl))
+                    {
+                        <img src="@Model.ImageUrl" alt="Ảnh chính" class="img-thumbnail" style="max-height: 200px;" />
+                    }
+                    else
+                    {
+                        <span>Không có ảnh</span>
+                    }
+                </dd>
+                <dt class="col-sm-3">Ảnh phụ</dt>
+                <dd class="col-sm-9">
+                    <div class="d-flex flex-wrap">
+                        @foreach (var image in Model.Images)
+                        {
+                            <img src="@image.Url" alt="Ảnh phụ" class="img-thumbnail me-2 mb-2" style="width: 100px; height: 100px; object-fit: cover;" />
+                        }
+                        @if (!Model.Images.Any())
+                        {
+                            <span>Không có ảnh phụ</span>
+                        }
+                    </div>
+                </dd>
+            </dl>
+            <div class="mt-4">
+                <a asp-action="Edit" asp-route-id="@Model.ProductId" class="btn btn-primary me-2"><i class="fas fa-edit"></i> Sửa</a>
+                <a asp-action="Index" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Quay lại</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .product-management-container { padding: 24px; }
+    .management-header { background-color: #f8f9fa; border-radius: 8px; margin-bottom: 24px !important; }
+    .management-header h2 { color: #2c3e50; font-weight: 600; margin-bottom: 8px !important; }
+    .img-thumbnail { border-radius: 6px; }
+    .badge { padding: 6px 10px; font-size: 0.75rem; font-weight: 500; border-radius: 4px; }
+    @@media (max-width: 768px) {
+        .product-management-container { padding: 16px; }
+    }
+</style>

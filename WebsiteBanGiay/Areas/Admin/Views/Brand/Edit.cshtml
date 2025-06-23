@@ -1,0 +1,143 @@
+﻿@model WebsiteBanGiay.Models.Brand
+
+@{
+    ViewData["Title"] = "Chỉnh sửa Thương hiệu";
+    Layout = "~/Areas/Admin/Views/Shared/_AdminLayout.cshtml";
+}
+
+<div class="brand-management-container">
+    <!-- Header Card -->
+    <div class="management-header card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="header-title">
+                    <h2 class="mb-1"><i class="fas fa-edit me-2"></i>@ViewData["Title"]</h2>
+                    <p class="text-muted mb-0">Cập nhật thông tin thương hiệu</p>
+                </div>
+                <a asp-action="Index" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Quay lại
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <form asp-action="Edit" enctype="multipart/form-data" class="needs-validation" novalidate>
+                <input type="hidden" asp-for="BrandId" />
+
+                <div class="row mb-3">
+                    <label asp-for="BrandName" class="col-sm-2 col-form-label">Tên thương hiệu</label>
+                    <div class="col-sm-10">
+                        <input asp-for="BrandName" class="form-control" required />
+                        <span asp-validation-for="BrandName" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <label asp-for="Description" class="col-sm-2 col-form-label">Mô tả</label>
+                    <div class="col-sm-10">
+                        <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                        <span asp-validation-for="Description" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <label class="col-sm-2 col-form-label">Logo hiện tại</label>
+                    <div class="col-sm-10">
+                        @if (!string.IsNullOrEmpty(Model.LogoUrl))
+                        {
+                                <img src="@Model.LogoUrl" alt="@Model.BrandName" class="brand-logo-preview mb-2" style="max-height: 100px;">
+                        }
+                        else
+                        {
+                                <div class="no-logo-preview mb-2">
+                                    <i class="fas fa-image fa-2x text-muted"></i>
+                                    <p class="text-muted mb-0">Không có logo</p>
+                                </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <label asp-for="LogoFile" class="col-sm-2 col-form-label">Thay đổi logo</label>
+                    <div class="col-sm-10">
+                        <div class="custom-file">
+                            <input asp-for="LogoFile" class="custom-file-input" id="customFile">
+                            <label class="custom-file-label" for="customFile">Chọn file mới (để trống nếu giữ nguyên)</label>
+                        </div>
+                        <span asp-validation-for="LogoFile" class="text-danger"></span>
+                        <small class="form-text text-muted">Chỉ chấp nhận file ảnh (jpg, png, jpeg, gif) với kích thước tối đa 2MB</small>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-sm-10 offset-sm-2">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-save me-1"></i>Lưu thay đổi
+                        </button>
+                        <a asp-action="Index" class="btn btn-secondary">
+                            <i class="fas fa-times me-1"></i>Hủy bỏ
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+        <script>
+            // Hiển thị tên file khi chọn
+            $(".custom-file-input").on("change", function() {
+                var fileName = $(this).val().split("\\").pop();
+                $(this).siblings(".custom-file-label").addClass("selected").html(fileName || "Chọn file mới (để trống nếu giữ nguyên)");
+            });
+
+            // Client-side validation
+            (function() {
+                'use strict';
+                window.addEventListener('load', function() {
+                    var forms = document.getElementsByClassName('needs-validation');
+                    var validation = Array.prototype.filter.call(forms, function(form) {
+                        form.addEventListener('submit', function(event) {
+                            if (form.checkValidity() === false) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                            }
+                            form.classList.add('was-validated');
+                        }, false);
+                    });
+                }, false);
+            })();
+        </script>
+}
+
+<style>
+    .brand-logo-preview {
+        max-width: 150px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 5px;
+    }
+
+    .no-logo-preview {
+        width: 150px;
+        height: 100px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 1px dashed #dee2e6;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+    }
+
+    .custom-file-label::after {
+        content: "Duyệt";
+    }
+</style>

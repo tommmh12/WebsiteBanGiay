@@ -1,0 +1,62 @@
+﻿@model WebsiteBanGiay.Models.Product
+
+@{
+    ViewData["Title"] = "Xóa sản phẩm";
+    ViewData["ActivePage"] = "Product";
+    Layout = "~/Areas/Admin/Views/Shared/_AdminLayout.cshtml";
+}
+
+<div class="product-management-container">
+    <!-- Header Card -->
+    <div class="management-header card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+            <h2 class="mb-1"><i class="fas fa-box me-2"></i>@ViewData["Title"]</h2>
+            <p class="text-muted mb-0">Xác nhận xóa sản phẩm</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <h4 class="text-danger mb-4">Bạn có chắc chắn muốn xóa sản phẩm "@Model.ProductName"?</h4>
+            <dl class="row">
+                <dt class="col-sm-3">Tên sản phẩm</dt>
+                <dd class="col-sm-9">@Model.ProductName</dd>
+                <dt class="col-sm-3">Giá</dt>
+                <dd class="col-sm-9">@Model.Price.ToString("N0") đ</dd>
+                <dt class="col-sm-3">Tồn kho</dt>
+                <dd class="col-sm-9">@Model.StockQuantity</dd>
+                <dt class="col-sm-3">Danh mục</dt>
+                <dd class="col-sm-9">@(Model.Category != null ? Model.Category.CategoryName : "N/A")</dd>
+                <dt class="col-sm-3">Thương hiệu</dt>
+                <dd class="col-sm-9">@(Model.Brand != null ? Model.Brand.BrandName : "N/A")</dd>
+                <dt class="col-sm-3">Ảnh chính</dt>
+                <dd class="col-sm-9">
+                    @if (!string.IsNullOrEmpty(Model.ImageUrl))
+                    {
+                        <img src="@Model.ImageUrl" alt="Ảnh chính" class="img-thumbnail" style="max-height: 200px;" />
+                    }
+                    else
+                    {
+                        <span>Không có ảnh</span>
+                    }
+                </dd>
+            </dl>
+            <form asp-action="Delete">
+                <input type="hidden" asp-for="ProductId" />
+                <button type="submit" class="btn btn-danger me-2"><i class="fas fa-trash-alt"></i> Xóa</button>
+                <a asp-action="Index" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Quay lại</a>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .product-management-container { padding: 24px; }
+    .management-header { background-color: #f8f9fa; border-radius: 8px; margin-bottom: 24px !important; }
+    .management-header h2 { color: #2c3e50; font-weight: 600; margin-bottom: 8px !important; }
+    .img-thumbnail { border-radius: 6px; }
+    @@media (max-width: 768px) {
+        .product-management-container { padding: 16px; }
+    }
+</style>

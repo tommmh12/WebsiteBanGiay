@@ -1,0 +1,98 @@
+﻿@model WebsiteBanGiay.Models.Brand
+
+@{
+    ViewData["Title"] = "Xóa Thương hiệu";
+    Layout = "~/Areas/Admin/Views/Shared/_AdminLayout.cshtml";
+}
+
+<div class="brand-management-container">
+    <!-- Header Card -->
+    <div class="management-header card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="header-title">
+                    <h2 class="mb-1"><i class="fas fa-trash-alt me-2"></i>@ViewData["Title"]</h2>
+                    <p class="text-muted mb-0">Xác nhận xóa thương hiệu</p>
+                </div>
+                <a asp-action="Index" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Quay lại
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <h4 class="text-danger mb-4">Bạn có chắc chắn muốn xóa thương hiệu này?</h4>
+
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-4">Tên thương hiệu:</dt>
+                        <dd class="col-sm-8">@Html.DisplayFor(model => model.BrandName)</dd>
+
+                        <dt class="col-sm-4">Mô tả:</dt>
+                        <dd class="col-sm-8">@Html.DisplayFor(model => model.Description)</dd>
+                    </dl>
+                </div>
+                <div class="col-md-6 text-center">
+                    @if (!string.IsNullOrEmpty(Model.LogoUrl))
+                    {
+                            <img src="@Model.LogoUrl" alt="@Model.BrandName" class="brand-logo-preview mb-2">
+                    }
+                    else
+                    {
+                            <div class="no-logo-preview mb-2 mx-auto">
+                                <i class="fas fa-image fa-2x text-muted"></i>
+                                <p class="text-muted mb-0">Không có logo</p>
+                            </div>
+                    }
+                </div>
+            </div>
+
+            <form asp-action="Delete" class="mt-4">
+                <input type="hidden" asp-for="BrandId" />
+                <div class="d-flex justify-content-between">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash-alt me-1"></i>Xác nhận xóa
+                    </button>
+                    <a asp-action="Index" class="btn btn-secondary">
+                        <i class="fas fa-times me-1"></i>Hủy bỏ
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .brand-logo-preview {
+        max-width: 200px;
+        max-height: 100px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 5px;
+    }
+
+    .no-logo-preview {
+        width: 200px;
+        height: 100px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 1px dashed #dee2e6;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+    }
+
+    dt {
+        font-weight: 500;
+        color: #6c757d;
+    }
+
+    dd {
+        margin-bottom: 0.5rem;
+    }
+</style>

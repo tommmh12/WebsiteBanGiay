@@ -1,0 +1,207 @@
+﻿@model WebsiteBanGiay.Models.Product
+
+@{
+    ViewData["Title"] = "Chỉnh sửa sản phẩm";
+    ViewData["ActivePage"] = "Product";
+    Layout = "~/Areas/Admin/Views/Shared/_AdminLayout.cshtml";
+}
+
+<div class="product-management-container">
+    <!-- Header Card -->
+    <div class="management-header card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+            <h2 class="mb-1"><i class="fas fa-box me-2"></i>@ViewData["Title"]</h2>
+            <p class="text-muted mb-0">Cập nhật thông tin sản phẩm</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <form asp-action="Edit" method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                <div asp-validation-summary="All" class="text-danger mb-3"></div>
+                <input type="hidden" asp-for="ProductId" />
+
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="form-group mb-3">
+                            <label asp-for="ProductName" class="form-label"></label>
+                            <input asp-for="ProductName" class="form-control" required />
+                            <span asp-validation-for="ProductName" class="text-danger"></span>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label asp-for="Description" class="form-label"></label>
+                            <textarea asp-for="Description" class="form-control" rows="5"></textarea>
+                            <span asp-validation-for="Description" class="text-danger"></span>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label asp-for="Price" class="form-label"></label>
+                                    <input asp-for="Price" type="number" step="0.01" min="0" class="form-control" required />
+                                    <span asp-validation-for="Price" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label asp-for="StockQuantity" class="form-label"></label>
+                                    <input asp-for="StockQuantity" type="number" min="0" class="form-control" required />
+                                    <span asp-validation-for="StockQuantity" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label asp-for="CategoryId" class="form-label"></label>
+                                    <select asp-for="CategoryId" class="form-control" required>
+                                        <option value="">-- Chọn danh mục --</option>
+                                        @foreach (var item in ViewBag.Categories)
+                                        {
+                                                <option value="@item.Value" selected="@(item.Selected ? "selected" : "")">@item.Text</option>
+                                        }
+                                    </select>
+                                    <span asp-validation-for="CategoryId" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label asp-for="BrandId" class="form-label"></label>
+                                    <select asp-for="BrandId" class="form-control" required>
+                                        <option value="">-- Chọn thương hiệu --</option>
+                                        @foreach (var item in ViewBag.Brands)
+                                        {
+                                                <option value="@item.Value" selected="@(item.Selected ? "selected" : "")">@item.Text</option>
+                                        }
+                                    </select>
+                                    <span asp-validation-for="BrandId" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group mb-3">
+                            <label asp-for="IsActive" class="form-label"></label>
+                            <div class="custom-control custom-switch">
+                                <input asp-for="IsActive" type="checkbox" class="custom-control-input" id="isActive" checked="@Model.IsActive" />
+                                <label class="custom-control-label" for="isActive"></label>
+                            </div>
+                            <span asp-validation-for="IsActive" class="text-danger"></span>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="form-label">Ảnh chính hiện tại</label>
+                            @if (!string.IsNullOrEmpty(Model.ImageUrl))
+                            {
+                                    <div class="text-center mb-2">
+                                        <img src="@Model.ImageUrl" alt="Ảnh chính" class="img-thumbnail" style="max-height: 200px;" />
+                                    </div>
+                            }
+                            <label class="form-label">Thay ảnh chính</label>
+                            <input type="file" name="newMainImage" class="form-control" id="newMainImage" accept="image/jpeg,image/jpg,image/png,image/gif" />
+                            <small class="form-text text-muted">Chỉ chấp nhận file ảnh (jpg, jpeg, png, gif), tối đa 5MB</small>
+                            <div class="mt-2 text-center">
+                                <img id="mainImagePreview" src="#" alt="Ảnh chính mới" class="img-thumbnail" style="max-height: 200px; display: none;" />
+                            </div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="form-label">Ảnh phụ hiện tại</label>
+                            <div class="d-flex flex-wrap mb-2">
+                                @foreach (var image in Model.Images)
+                                {
+                                        <div class="position-relative mr-2 mb-2" style="width: 100px;">
+                                            <input type="checkbox" name="deleteImages" value="@image.ImageId" id="delete_@image.ImageId" class="position-absolute top-0 start-0 m-1" />
+                                            <label for="delete_@image.ImageId" class="d-block">
+                                                <img src="@image.Url" alt="Ảnh phụ" class="img-thumbnail" style="width: 100px; height: 100px; object-fit: cover;" />
+                                            </label>
+                                        </div>
+                                }
+                            </div>
+                            <label class="form-label">Thêm ảnh phụ mới</label>
+                            <input type="file" name="newAdditionalImages" class="form-control" id="newAdditionalImages" multiple accept="image/jpeg,image/jpg,image/png,image/gif" />
+                            <small class="form-text text-muted">Chỉ chấp nhận file ảnh (jpg, jpeg, png, gif), tối đa 5MB mỗi ảnh</small>
+                            <div id="additionalImagesPreview" class="d-flex flex-wrap mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group mt-4">
+                    <button type="submit" class="btn btn-primary me-2"><i class="fas fa-save"></i> Lưu</button>
+                    <a asp-action="Index" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Quay lại</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .product-management-container { padding: 24px; }
+    .management-header { background-color: #f8f9fa; border-radius: 8px; margin-bottom: 24px !important; }
+    .management-header h2 { color: #2c3e50; font-weight: 600; margin-bottom: 8px !important; }
+    .form-label { font-weight: 500; }
+    .form-control { border-radius: 6px; }
+    .custom-control-label::before, .custom-control-label::after { top: 0.25rem; }
+    .img-thumbnail { border-radius: 6px; }
+    @@media (max-width: 768px) {
+        .product-management-container { padding: 16px; }
+    }
+</style>
+
+@section Scripts {
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+        <script>
+            $('#newMainImage').on('change', function() {
+                const file = this.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        $('#mainImagePreview').attr('src', e.target.result).show();
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    $('#mainImagePreview').hide();
+                }
+            });
+            $('#newAdditionalImages').on('change', function() {
+                const files = this.files;
+                const $previewContainer = $('#additionalImagesPreview');
+                $previewContainer.empty();
+                if (files.length > 0) {
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            $previewContainer.append(`
+                                <div class="position-relative mr-2 mb-2" style="width: 100px;">
+                                    <img src="${e.target.result}" class="img-thumbnail" style="width: 100px; height: 100px; object-fit: cover;" />
+                                </div>
+                            `);
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                }
+            });
+            (function() {
+                window.addEventListener('load', function() {
+                    var forms = document.getElementsByClassName('needs-validation');
+                    Array.prototype.filter.call(forms, function(form) {
+                        form.addEventListener('submit', function(event) {
+                            if (form.checkValidity() === false) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                            }
+                            form.classList.add('was-validated');
+                        }, false);
+                    });
+                });
+            })();
+            $('select[required]').on('change', function() {
+                if ($(this).val()) {
+                    $(this).removeClass('is-invalid').addClass('is-valid');
+                } else {
+                    $(this).removeClass('is-valid').addClass('is-invalid');
+                }
+            });
+        </script>
+}
