@@ -39,6 +39,20 @@ namespace WebsiteBanGiay.Models
         [Display(Name = "Ảnh đại diện")]
         public string ImageUrl { get; set; }
 
+        [NotMapped]
+        [Display(Name = "Ảnh đại diện")]
+        [DataType(DataType.Upload)]
+        [AllowedExtensions(new string[] { ".jpg", ".png", ".jpeg", ".gif" }, ErrorMessage = "Chỉ chấp nhận file ảnh (jpg, png, jpeg, gif)")]
+        [MaxFileSize(2 * 1024 * 1024, ErrorMessage = "Kích thước file không được vượt quá 2MB")]
+        public IFormFile ImageFile { get; set; }
+
+        [NotMapped]
+        [Display(Name = "Ảnh sản phẩm (nhiều ảnh)")]
+        [DataType(DataType.Upload)]
+        [AllowedExtensions(new string[] { ".jpg", ".png", ".jpeg", ".gif" }, ErrorMessage = "Chỉ chấp nhận file ảnh (jpg, png, jpeg, gif)")]
+        [MaxFileSize(5 * 1024 * 1024, ErrorMessage = "Tổng kích thước files không được vượt quá 5MB")]
+        public List<IFormFile> ProductImages { get; set; } = new List<IFormFile>();
+
         [Required(ErrorMessage = "Danh mục là bắt buộc")]
         [Display(Name = "Danh mục")]
         public int CategoryId { get; set; }
@@ -68,5 +82,6 @@ namespace WebsiteBanGiay.Models
         public virtual ICollection<OrderDetail> OrderDetails { get; set; }
         public virtual ICollection<CartItem> CartItems { get; set; }
         public virtual ICollection<Review> Reviews { get; set; }
+
     }
 }

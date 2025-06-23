@@ -1,0 +1,337 @@
+﻿@model IEnumerable<WebsiteBanGiay.Models.Product>
+
+@{
+    ViewData["Title"] = "Quản lý Sản phẩm";
+    ViewData["ActivePage"] = "Product";
+    Layout = "~/Areas/Admin/Views/Shared/_AdminLayout.cshtml";
+}
+
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mt-4">
+                <i class="fas fa-boxes me-2"></i>@ViewData["Title"]
+            </h1>
+            <ol class="breadcrumb mb-4">
+                <li class="breadcrumb-item"><a asp-area="Admin" asp-controller="Home" asp-action="Index">Dashboard</a></li>
+                <li class="breadcrumb-item active">Sản phẩm</li>
+            </ol>
+        </div>
+        <a asp-action="Create" class="btn btn-primary btn-lg">
+            <i class="fas fa-plus-circle me-1"></i> Thêm mới
+        </a>
+    </div>
+
+    <!-- Flash Message -->
+    @if (TempData["Success"] != null)
+    {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="fas fa-check-circle me-2"></i> @TempData["Success"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-circle me-2"></i> @TempData["Error"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+    }
+
+    <div class="card mb-4">
+        <div class="card-header bg-white py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fas fa-table me-1"></i>
+                    <span class="fw-bold">Danh sách sản phẩm</span>
+                </div>
+                <div class="d-flex">
+                    <div class="input-group input-group-sm me-2" style="width: 250px;">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm sản phẩm...">
+                        <button class="btn btn-outline-secondary" type="button" id="searchButton">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="filterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-filter me-1"></i> Lọc
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="filterDropdown">
+                            <li><h6 class="dropdown-header">Theo trạng thái</h6></li>
+                            <li><a class="dropdown-item filter-status" href="#" data-status="all">Tất cả</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item filter-status" href="#" data-status="true">Đang hiển thị</a></li>
+                            <li><a class="dropdown-item filter-status" href="#" data-status="false">Đang ẩn</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle" id="productTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="80px">Ảnh</th>
+                            <th>Tên sản phẩm</th>
+                            <th>Thương hiệu</th>
+                            <th>Danh mục</th>
+                            <th class="text-end">Giá</th>
+                            <th class="text-center">Tồn kho</th>
+                            <th class="text-center">Trạng thái</th>
+                            <th class="text-center" width="150px">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                                <tr data-status="@item.IsActive.ToString().ToLower()">
+                                    <td>
+                                        <div class="product-thumbnail">
+                                        @if (!string.IsNullOrEmpty(item.ImageUrl))
+                                        {
+                                                    <img src="@item.ImageUrl" alt="@item.ProductName" class="img-thumbnail">
+                                        }
+                                        else
+                                        {
+                                                    <div class="no-image-placeholder">
+                                                        <i class="fas fa-image"></i>
+                                                    </div>
+                                        }
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex flex-column">
+                                            <strong>@item.ProductName</strong>
+                                            <small class="text-muted">ID: @item.ProductId</small>
+                                        @if (!string.IsNullOrEmpty(item.Slug))
+                                        {
+                                                    <small class="text-muted">Slug: @item.Slug</small>
+                                        }
+                                        </div>
+                                    </td>
+                                    <td>@(item.Brand?.BrandName ?? "N/A")</td>
+                                    <td>@(item.Category?.CategoryName ?? "N/A")</td>
+                                    <td class="text-end">
+                                    @if (item.DiscountPrice.HasValue && item.DiscountPrice > 0)
+                                    {
+                                                <span class="text-danger fw-bold">@item.DiscountPrice.Value.ToString("N0") đ</span>
+                                                <br>
+                                                <small class="text-decoration-line-through text-muted">@item.Price.ToString("N0") đ</small>
+                                    }
+                                    else
+                                    {
+                                                <span>@item.Price.ToString("N0") đ</span>
+                                    }
+                                    </td>
+                                    <td class="text-center">
+                                    @if (item.StockQuantity > 10)
+                                    {
+                                                <span class="badge bg-success">@item.StockQuantity</span>
+                                    }
+                                    else if (item.StockQuantity > 0)
+                                    {
+                                                <span class="badge bg-warning text-dark">@item.StockQuantity</span>
+                                    }
+                                    else
+                                    {
+                                                <span class="badge bg-danger">Hết hàng</span>
+                                    }
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="form-check form-switch d-inline-block">
+                                            <input class="form-check-input status-toggle" type="checkbox" 
+                                                   id="status-@item.ProductId" @(item.IsActive ? "checked" : "")
+                                                   data-id="@item.ProductId">
+                                            <label class="form-check-label" for="status-@item.ProductId"></label>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a asp-action="Edit" asp-route-id="@item.ProductId" 
+                                               class="btn btn-outline-primary" title="Chỉnh sửa">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a asp-action="Details" asp-route-id="@item.ProductId" 
+                                               class="btn btn-outline-info" title="Chi tiết">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <button type="button" class="btn btn-outline-danger delete-btn" 
+                                                    title="Xóa" data-id="@item.ProductId" data-name="@item.ProductName">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">Xác nhận xóa</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Bạn có chắc chắn muốn xóa sản phẩm <strong id="productNameToDelete"></strong>?</p>
+                <p class="text-danger">Hành động này không thể hoàn tác!</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <form id="deleteForm" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-danger">Xóa</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+        <style>
+            .product-thumbnail {
+                width: 60px;
+                height: 60px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background-color: #f8f9fa;
+                border-radius: 4px;
+                overflow: hidden;
+            }
+
+            .product-thumbnail img {
+                max-width: 100%;
+                max-height: 100%;
+                object-fit: contain;
+            }
+
+            .no-image-placeholder {
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #adb5bd;
+                background-color: #f8f9fa;
+            }
+
+            .form-switch .form-check-input {
+                width: 3em;
+                height: 1.5em;
+                cursor: pointer;
+            }
+
+            .badge {
+                min-width: 50px;
+                padding: 5px 8px;
+                font-weight: 500;
+            }
+
+            .btn-group .btn {
+                padding: 0.25rem 0.5rem;
+            }
+
+            .table-hover tbody tr:hover {
+                background-color: rgba(0, 0, 0, 0.02);
+            }
+
+            .text-decoration-line-through {
+                text-decoration: line-through;
+            }
+        </style>
+}
+
+@section Scripts {
+        <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+        <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+        <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+
+        <script>
+            $(document).ready(function() {
+                // Initialize DataTable
+                var table = $('#productTable').DataTable({
+                    language: {
+                        url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/vi.json'
+                    },
+                    columnDefs: [
+                        { orderable: false, targets: [0, 6, 7] },
+                        { className: 'text-center', targets: [5, 6, 7] }
+                    ],
+                    responsive: true,
+                    initComplete: function() {
+                        $('.dataTables_filter input').attr('placeholder', 'Tìm kiếm sản phẩm...');
+                    }
+                });
+
+                // Search functionality
+                $('#searchInput').keyup(function() {
+                    table.search($(this).val()).draw();
+                });
+
+                $('#searchButton').click(function() {
+                    table.search($('#searchInput').val()).draw();
+                });
+
+                // Status filter
+                $('.filter-status').click(function(e) {
+                    e.preventDefault();
+                    var status = $(this).data('status');
+
+                    if (status === 'all') {
+                        table.columns().search('').draw();
+                    } else {
+                        table.column(6).search(status).draw();
+                    }
+                });
+
+                // Status toggle
+                $('.status-toggle').change(function() {
+                    var productId = $(this).data('id');
+                    var isActive = $(this).is(':checked');
+
+                    $.ajax({
+                        url: '@Url.Action("ToggleStatus", "Products")',
+                        type: 'POST',
+                        data: {
+                            id: productId,
+                            isActive: isActive
+                        },
+                        headers: {
+                            'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                toastr.success('Cập nhật trạng thái thành công');
+                            } else {
+                                toastr.error('Có lỗi xảy ra khi cập nhật trạng thái');
+                                // Revert the toggle if failed
+                                $('.status-toggle[data-id="' + productId + '"]').prop('checked', !isActive);
+                            }
+                        },
+                        error: function() {
+                            toastr.error('Có lỗi xảy ra khi kết nối với server');
+                            $('.status-toggle[data-id="' + productId + '"]').prop('checked', !isActive);
+                        }
+                    });
+                });
+
+                // Delete confirmation modal
+                $('.delete-btn').click(function() {
+                    var productId = $(this).data('id');
+                    var productName = $(this).data('name');
+
+                    $('#productNameToDelete').text(productName);
+                    $('#deleteForm').attr('action', '@Url.Action("Delete", "Products")/' + productId);
+                    $('#deleteModal').modal('show');
+                });
+            });
+        </script>
+}
